@@ -5,6 +5,7 @@ import cv2
 from numpy import ndarray
 from tqdm import tqdm
 import subprocess
+from datetime import timedelta
 
 def time2frame(time: Tuple[str,str],fps:float):
     """
@@ -133,6 +134,8 @@ def detect_face(frame: ndarray, face_classifier, show_box: bool = False,) -> boo
 
 
 def get_intervals(sequence:List[int])->List[Tuple[int,int]]:
+    # print(get_intervals([1,2,3,4,5,6,7,8,10,11,12,13,14,15,17,19,29,30,31,32,40]))
+
     prev, sx_bound  = sequence[0], sequence[0]
     intervals = []
 
@@ -155,6 +158,8 @@ def get_face_interval(video_path: str, time: Tuple[str, str]):
 
     # retrieve the fps
     fps = cap.get(cv2.CAP_PROP_FPS)
+    print(fps)
+    exit()
     # given the start/ end time, we calculate the start/end frame
     start_frame, end_frame = time2frame(time, fps)
 
@@ -191,9 +196,16 @@ def get_face_interval(video_path: str, time: Tuple[str, str]):
     intervals = get_intervals(face_frame)
     print(intervals)
 
-    with open('your_file.txt', 'w') as f:
+    with open('frame_intervals.txt', 'w') as f:
         for line in intervals:
             f.write(f"{line}\n")
 
+    with open('time_intervals.txt', 'w') as f:
+        for a,b in intervals:
+            f.write(f"{frame_to_timestamp(fps,a)} {frame_to_timestamp(fps,b)}\n")
 
-# print(get_intervals([1,2,3,4,5,6,7,8,10,11,12,13,14,15,17,19,29,30,31,32,40]))
+def frame_to_timestamp(fps_rate:float, frame_number: int) -> str:
+    milliseconds = (frame_number / fps_rate) * 1000  # Tempo in ms
+    timestamp = str(timedelta(milliseconds=milliseconds))
+    return timestamp
+
