@@ -132,6 +132,19 @@ def detect_face(frame: ndarray, face_classifier, show_box: bool = False,) -> boo
     return len(faces) != 0
 
 
+def get_intervals(sequence:List[int])->List[Tuple[int,int]]:
+    prev, sx_bound  = sequence[0], sequence[0]
+    intervals = []
+
+    for curr in sequence[1:]:
+        if curr - prev > 1:
+            intervals.append((sx_bound, prev))
+            sx_bound = curr
+        prev = curr
+    intervals.append((sx_bound, prev))
+
+    return intervals
+
 def get_face_interval(video_path: str, time: Tuple[str, str]):
 
 
@@ -175,20 +188,12 @@ def get_face_interval(video_path: str, time: Tuple[str, str]):
         cap.release()
         cv2.destroyAllWindows()
 
-    print(face_frame)
-    print(get_intervals(face_frame))
+    intervals = get_intervals(face_frame)
+    print(intervals)
 
-def get_intervals(sequence:List[int])->List[Tuple[int,int]]:
-    prev, sx_bound  = sequence[0], sequence[0]
-    intervals = []
+    with open('your_file.txt', 'w') as f:
+        for line in intervals:
+            f.write(f"{line}\n")
 
-    for curr in sequence[1:]:
-        if curr - prev > 1:
-            intervals.append((sx_bound, prev))
-            sx_bound = curr
-        prev = curr
-    intervals.append((sx_bound, prev))
-
-    return intervals
 
 # print(get_intervals([1,2,3,4,5,6,7,8,10,11,12,13,14,15,17,19,29,30,31,32,40]))
