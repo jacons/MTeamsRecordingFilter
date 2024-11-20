@@ -1,5 +1,6 @@
 from datetime import datetime
-from typing import Tuple, List
+from pathlib import Path
+from typing import Tuple, List, Callable
 
 import cv2
 from numpy import ndarray
@@ -7,7 +8,8 @@ from tqdm import tqdm
 import subprocess
 from datetime import timedelta
 
-def time2frame(time: Tuple[str,str],fps:float):
+
+def time2frame(time: Tuple[str, str], fps: float)-> Tuple[int, int]:
     """
     Calculate start and end frame numbers based on start and end times
     :param time: (start, end)
@@ -21,46 +23,27 @@ def time2frame(time: Tuple[str,str],fps:float):
     end_frame = int(fps * (end_time - origin_time).total_seconds())
     return start_frame, end_frame
 
-
-def extract_audio(video_path:str, time: Tuple[str,str], output_audio_path:str):
-    """
-    Extract audio from a video file for the given time range.
-    :param video_path: Path to the original video.
-    :param time: Start/End time in HH:MM:SS format.
-    :param output_audio_path: Path to save the extracted audio.
-    """
-    command = [
-        "ffmpeg",
-        "-y",  # Overwrite existing files
-        "-i", video_path,
-        "-ss", time[0],
-        "-to", time[1],
-        "-vn",  # No video, audio only
-        "-acodec", "copy",
-        output_audio_path,
-    ]
+def execute_ffmpeg(command: List[str]):
+    """Run an ffmpeg command."""
     subprocess.run(command, check=True)
 
-def merge_video_audio(video_no_audio:str, audio_path: str, output_file: str):
-    """
-    Combine the processed video with extracted audio.
-    :param video_no_audio: Path to the processed video (no audio).
-    :param audio_path: Path to the extracted audio.
-    :param output_file: Output file path with video and audio combined.
-    """
+def extract_audio(video_path: str, time: Tuple[str, str], output_audio_path: str):
+    """Extract audio from a video for a specific time range."""
     command = [
-        "ffmpeg",
-        "-y",
-        "-i", video_no_audio,
-        "-i", audio_path,
-        "-c:v", "copy",  # Copy the video stream without re-encoding
-        "-c:a", "aac",   # Ensure compatibility with most players
-        output_file,
+        "ffmpeg", "-y", "-i", video_path, "-ss", time[0], "-to", time[1],
+        "-vn", "-acodec", "copy", output_audio_path
     ]
-    subprocess.run(command, check=True)
+    execute_ffmpeg(command)
 
+def merge_video_audio(video_no_audio: str, audio_path: str, output_file: str):
+    """Merge a video without audio with an audio track."""
+    command = [
+        "ffmpeg", "-y", "-i", video_no_audio, "-i", audio_path,
+        "-c:v", "copy", "-c:a", "aac", output_file
+    ]
+    execute_ffmpeg(command)
 
-def initialize_video_writer(output_file:str, frame:Tuple[int,int], fps:float):
+def initialize_video_writer(output_file: str, frame: Tuple[int, int], fps: float)-> cv2.VideoWriter:
     """
     :param output_file:
     :param frame: Tuple(height, width)
@@ -77,185 +60,134 @@ def initialize_video_writer(output_file:str, frame:Tuple[int,int], fps:float):
         raise RuntimeError("Error: Failed to initialize video writer.")
     return out
 
-
-def crop_video(video_path:str, output_file:str, time:Tuple[str,str], crop_frame : Tuple[slice,slice]):
-
-    # Open the video
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise RuntimeError(f"Error: Could not open video file {video_path}")
-
-    # retrieve the fps
-    fps = cap.get(cv2.CAP_PROP_FPS)
-
-    # given the start/ end time, we calculate the start/end frame
-    start_frame, end_frame = time2frame(time, fps)
-
-    # Set the reader to a certain frame
-    cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
-
-    # from the slide, we obtain the  output frame dimensions
-    height = crop_frame[0].stop - crop_frame[0].start
-    width = crop_frame[1].stop - crop_frame[1].start
-    # Initialize the output video object
-    out = initialize_video_writer(output_file=output_file,
-                                  frame=(height,width),
-                                  fps=fps)
-
-    total_frames = end_frame - start_frame
-    pbar = tqdm(total=total_frames, desc="Processing frames", unit="frame")
-
-    try:
-        for _ in range(total_frames):
-            ret, frame = cap.read()
-            if not ret:
-                break
-            cropped_frame = frame[crop_frame[0], crop_frame[1]]
-            out.write(cropped_frame)
-            pbar.update(1)
-    finally:
-        # Ensure resources are released even if an error occurs
-        pbar.close()
-        out.release()
-        cap.release()
-        cv2.destroyAllWindows()
-
-
-def detect_face(frame: ndarray, face_classifier, show_box: bool = False,) -> bool:
-    faces = face_classifier.detectMultiScale(image=cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY),
-                                             scaleFactor=1.1,
-                                             minNeighbors=5,
-                                             minSize=(40, 40))
-    if show_box:
-        for (x, y, w, h) in faces:
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
-
-    return len(faces) != 0
-
-
-def get_intervals(sequence:List[int])->List[Tuple[int,int]]:
+def get_intervals(sequence: List[int]) -> List[Tuple[int, int]]:
     # print(get_intervals([1,2,3,4,5,6,7,8,10,11,12,13,14,15,17,19,29,30,31,32,40]))
-
-    prev, sx_bound  = sequence[0], sequence[0]
     intervals = []
+    if not sequence:
+        return intervals
 
+    prev, sx_bound = sequence[0], sequence[0]
     for curr in sequence[1:]:
         if curr - prev > 1:
             intervals.append((sx_bound, prev))
             sx_bound = curr
         prev = curr
     intervals.append((sx_bound, prev))
-
     return intervals
 
-def get_face_interval(video_path: str, time: Tuple[str, str]):
-
-
-    # Open the video
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise RuntimeError(f"Error: Could not open video file {video_path}")
-
-    # retrieve the fps
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    print(fps)
-    exit()
-    # given the start/ end time, we calculate the start/end frame
-    start_frame, end_frame = time2frame(time, fps)
-
-    # Set the reader to a certain frame
-    cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
-
-    total_frames = end_frame - start_frame
-    pbar = tqdm(total=total_frames, desc="Processing frames", unit="frame")
-
-    face_classifier = cv2.CascadeClassifier('./src/haarcascade_frontalface_default.xml')
-
-    print("Start on frame: ", start_frame)
-    face_frame = []
-    try:
-        for current in range(total_frames):
-            ret, frame = cap.read()
-            if not ret:
-                break
-
-            if detect_face(frame, face_classifier, show_box=False):
-                face_frame.append(current + start_frame)
-
-            # cv2.imshow("My Face Detection Project", frame)
-
-            # if cv2.waitKey(1) & 0xFF == ord("q"):
-            #     break
-            pbar.update(1)
-    finally:
-        # Ensure resources are released even if an error occurs
-        pbar.close()
-        cap.release()
-        cv2.destroyAllWindows()
-
-    intervals = get_intervals(face_frame)
-    print(intervals)
-
-    with open('frame_intervals.txt', 'w') as f:
-        for line in intervals:
-            f.write(f"{line}\n")
-
-    with open('time_intervals.txt', 'w') as f:
-        for a,b in intervals:
-            f.write(f"{frame_to_timestamp(fps,a)} {frame_to_timestamp(fps,b)}\n")
-
-def frame_to_timestamp(fps_rate:float, frame_number: int) -> str:
+def frame_to_timestamp(fps_rate: float, frame_number: int) -> str:
     milliseconds = (frame_number / fps_rate) * 1000  # Tempo in ms
     timestamp = str(timedelta(milliseconds=milliseconds))
     return timestamp
 
 
-def crop_detect(video_path: str, time: Tuple[str, str], crop_frame: Tuple[slice, slice]):
+def detect_face(frame: ndarray, classifiers) -> bool:
 
-    # Open the video
+    to_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    flag = any(len(classifier.detectMultiScale(image=to_gray, scaleFactor=1.1, minNeighbors=5,minSize=(40, 40))>0)
+               for classifier in classifiers)
+
+    return flag
+
+def process_frames(video_path: str, time: Tuple[str, str], fn:Callable):
+    """General function to process frames within a specific time range."""
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        raise RuntimeError(f"Error: Could not open video file {video_path}")
+            raise RuntimeError(f"Error: Could not open video file {video_path}")
 
-    # retrieve the fps
     fps = cap.get(cv2.CAP_PROP_FPS)
-
-    # given the start/ end time, we calculate the start/end frame
     start_frame, end_frame = time2frame(time, fps)
-
-    # Set the reader to a certain frame
     cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
-
     total_frames = end_frame - start_frame
-    pbar = tqdm(total=total_frames, desc="Processing frames", unit="frame")
 
-    face_classifier = cv2.CascadeClassifier('./src/haarcascade_frontalface_default.xml')
-
-    face_frame = []
-    try:
-        for current in range(total_frames):
+    with tqdm(total=total_frames, desc="Processing frames", unit="frame") as pbar:
+        for n_frame in range(total_frames):
             ret, frame = cap.read()
             if not ret:
                 break
-
-            cropped_frame = frame[crop_frame[0], crop_frame[1]]
-            if detect_face(cropped_frame, face_classifier, show_box=False):
-                face_frame.append(current + start_frame)
-
+            fn(frame=frame, n_frame=n_frame)
             pbar.update(1)
-    finally:
-        # Ensure resources are released even if an error occurs
-        pbar.close()
-        cap.release()
-        cv2.destroyAllWindows()
+    cap.release()
 
-    intervals = get_intervals(face_frame)
-    # print(intervals)
+def crop_video(video_path: str, output_file: str, time: Tuple[str, str],
+               crop_frame: Tuple[slice, slice]):
 
-    with open('frame_intervals.txt', 'w') as f:
+
+    # from the slide, we obtain the  output frame dimensions
+    height = crop_frame[0].stop - crop_frame[0].start
+    width = crop_frame[1].stop - crop_frame[1].start
+
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    cap.release()
+
+    out = initialize_video_writer(output_file=output_file, frame=(height, width), fps=fps)
+
+    def crop_fn(frame:ndarray, n_frame:int):
+        cropped_frame = frame[crop_frame[0], crop_frame[1]]
+        out.write(cropped_frame)
+
+    process_frames(video_path=video_path, time=time, fn=crop_fn)
+
+    out.release()
+
+
+def get_and_print_intervals(face_frames:List[int], fps:float, folder:Path):
+    intervals = get_intervals(face_frames)
+
+    Path(folder).mkdir(parents=True, exist_ok=True)
+    with Path(folder / "frame_intervals.txt").open("w") as f:
         for line in intervals:
             f.write(f"{line}\n")
 
-    with open('time_intervals.txt', 'w') as f:
+    with Path(folder / "time_intervals.txt").open("w") as f:
         for a, b in intervals:
             f.write(f"{frame_to_timestamp(fps, a)} {frame_to_timestamp(fps, b)}\n")
+
+def detect_faces(video_path: str, time: Tuple[str, str], folder:Path):
+
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    cap.release()
+
+    classifiers = (
+        cv2.CascadeClassifier('./src/haarcascade_frontalface_default.xml'),
+        cv2.CascadeClassifier('./src/haarcascade_profileface.xml')
+    )
+
+    face_frames = []
+    def detect_fn(frame: ndarray, n_frame:int):
+        to_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        flag = any(
+            len(classifier.detectMultiScale(image=to_gray, scaleFactor=1.1, minNeighbors=5, minSize=(40, 40))) > 0
+            for classifier in classifiers)
+        if flag:
+            face_frames.append(n_frame)
+
+    process_frames(video_path=video_path, time=time, fn=detect_fn)
+    get_and_print_intervals(face_frames,fps, folder=folder)
+
+
+def crop_detect(video_path: str, time: Tuple[str, str], crop_frame: Tuple[slice, slice],
+                folder:Path):
+
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    cap.release()
+
+    classifiers = (
+        cv2.CascadeClassifier('./src/haarcascade_frontalface_default.xml'),
+        cv2.CascadeClassifier('./src/haarcascade_profileface.xml')
+    )
+    face_frames = []
+    def crop_detect_fn(frame:ndarray, n_frame:int):
+        cropped_frame = frame[crop_frame[0], crop_frame[1]]
+        to_gray = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2GRAY)
+        flag = any(
+            len(classifier.detectMultiScale(image=to_gray, scaleFactor=1.1, minNeighbors=5, minSize=(40, 40))) > 0
+            for classifier in classifiers)
+        if flag:
+            face_frames.append(n_frame)
+
+    process_frames(video_path=video_path, time=time, fn=crop_detect_fn)
+    get_and_print_intervals(face_frames=face_frames,fps=fps, folder=folder)

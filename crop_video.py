@@ -2,9 +2,10 @@ from Utils.functions import crop_video, extract_audio, merge_video_audio
 
 # ---------- PARAMETERS ----------
 video_path = "src/videos/video_test.mp4"
-temp_audio_path = "src/tmp/audio_tmp.aac"
-temp_video_path = "src/tmp/video_tmp.mp4"
-output_file = "src/output/cropped_video.mp4"
+output_file = "output/cropped_video.mp4"
+
+temp_audio_path = "tmp/audio_tmp.aac"
+temp_video_path = "tmp/video_tmp.mp4"
 
 start = "00:00:00"  # Specify start time in hh:mm:ss
 end = "00:10:00"  # Specify end time in hh:mm:ss
