@@ -1,4 +1,4 @@
-from Utils.functions import process_video, extract_audio, merge_video_audio
+from Utils.functions import crop_video, extract_audio, merge_video_audio
 
 # ---------- PARAMETERS ----------
 video_path = "src/videos/video_test.mp4"
@@ -21,10 +21,10 @@ extract_audio(video_path=video_path,
               output_audio_path=temp_audio_path)
 
 # Run the video processing
-process_video(video_path=video_path,
-              output_file=temp_video_path,
-              time=(start,end),
-              crop_frame=(height_slice,width_slice))
+crop_video(video_path=video_path,
+           output_file=temp_video_path,
+           time=(start,end),
+           crop_frame=(height_slice,width_slice))
 
 # Merge the processed video with the extracted audio
 merge_video_audio(video_no_audio=temp_video_path,

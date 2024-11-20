@@ -78,7 +78,7 @@ def initialize_video_writer(output_file:str, frame:Tuple[int,int], fps:float):
     return out
 
 
-def process_video(video_path:str, output_file:str, time:Tuple[str,str], crop_frame : Tuple[slice,slice]):
+def crop_video(video_path:str, output_file:str, time:Tuple[str,str], crop_frame : Tuple[slice,slice]):
 
     # Open the video
     cap = cv2.VideoCapture(video_path)
@@ -209,3 +209,53 @@ def frame_to_timestamp(fps_rate:float, frame_number: int) -> str:
     timestamp = str(timedelta(milliseconds=milliseconds))
     return timestamp
 
+
+def crop_detect(video_path: str, time: Tuple[str, str], crop_frame: Tuple[slice, slice]):
+
+    # Open the video
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise RuntimeError(f"Error: Could not open video file {video_path}")
+
+    # retrieve the fps
+    fps = cap.get(cv2.CAP_PROP_FPS)
+
+    # given the start/ end time, we calculate the start/end frame
+    start_frame, end_frame = time2frame(time, fps)
+
+    # Set the reader to a certain frame
+    cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+
+    total_frames = end_frame - start_frame
+    pbar = tqdm(total=total_frames, desc="Processing frames", unit="frame")
+
+    face_classifier = cv2.CascadeClassifier('./src/haarcascade_frontalface_default.xml')
+
+    face_frame = []
+    try:
+        for current in range(total_frames):
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            cropped_frame = frame[crop_frame[0], crop_frame[1]]
+            if detect_face(cropped_frame, face_classifier, show_box=False):
+                face_frame.append(current + start_frame)
+
+            pbar.update(1)
+    finally:
+        # Ensure resources are released even if an error occurs
+        pbar.close()
+        cap.release()
+        cv2.destroyAllWindows()
+
+    intervals = get_intervals(face_frame)
+    # print(intervals)
+
+    with open('frame_intervals.txt', 'w') as f:
+        for line in intervals:
+            f.write(f"{line}\n")
+
+    with open('time_intervals.txt', 'w') as f:
+        for a, b in intervals:
+            f.write(f"{frame_to_timestamp(fps, a)} {frame_to_timestamp(fps, b)}\n")
