@@ -1,6 +1,6 @@
 from datetime import datetime
 from pathlib import Path
-from typing import Tuple, List, Callable
+from typing import Tuple, List, Callable, Union
 
 import cv2
 from numpy import ndarray
@@ -9,18 +9,24 @@ import subprocess
 from datetime import timedelta
 
 
-def time2frame(time: Tuple[str, str], fps: float)-> Tuple[int, int]:
+def time2frame(time: Tuple[str, Union[str,None]], fps: float, tot_frames: float)-> Tuple[int, int]:
     """
     Calculate start and end frame numbers based on start and end times
     :param time: (start, end)
     :param fps:
+    :param tot_frames:
     :return:
     """
     origin_time = datetime.strptime("00:00:00", "%H:%M:%S")
+
     start_time = datetime.strptime(time[0], "%H:%M:%S")
-    end_time = datetime.strptime(time[1], "%H:%M:%S")
     start_frame = int(fps * (start_time - origin_time).total_seconds())
-    end_frame = int(fps * (end_time - origin_time).total_seconds())
+
+    if time[1] is None:
+        end_frame = int(tot_frames)
+    else:
+        end_time = datetime.strptime(time[1], "%H:%M:%S")
+        end_frame = int(fps * (end_time - origin_time).total_seconds())
     return start_frame, end_frame
 
 def execute_ffmpeg(command: List[str]):
@@ -89,14 +95,15 @@ def detect_face(frame: ndarray, classifiers) -> bool:
 
     return flag
 
-def process_frames(video_path: str, time: Tuple[str, str], fn:Callable):
+def process_frames(video_path: str, time: Tuple[str, Union[str, None]], fn:Callable):
     """General function to process frames within a specific time range."""
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
             raise RuntimeError(f"Error: Could not open video file {video_path}")
 
     fps = cap.get(cv2.CAP_PROP_FPS)
-    start_frame, end_frame = time2frame(time, fps)
+    tot_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+    start_frame, end_frame = time2frame(time=time, fps=fps, tot_frames=tot_frames)
     cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
     total_frames = end_frame - start_frame
 
@@ -168,7 +175,7 @@ def detect_faces(video_path: str, time: Tuple[str, str], folder:Path):
     get_and_print_intervals(face_frames,fps, folder=folder)
 
 
-def crop_detect(video_path: str, time: Tuple[str, str], crop_frame: Tuple[slice, slice],
+def crop_detect(video_path: str, time: Tuple[str, Union[str,None]], crop_frame: Tuple[slice, slice],
                 folder:Path):
 
     cap = cv2.VideoCapture(video_path)

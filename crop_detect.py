@@ -7,7 +7,7 @@ video_path = "src/videos/video_test.mp4"
 folder = Path("./output/test1/")
 
 start = "00:00:00"  # Specify start time in hh:mm:ss
-end = "01:00:00"  # Specify end time in hh:mm:ss
+end = None  # Specify end time in hh:mm:ss
 
 frame_width = 1675
 frame_height = 1080 - 65
