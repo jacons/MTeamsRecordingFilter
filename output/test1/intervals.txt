@@ -1,0 +1,11 @@
+[
+    {
+        "frame_start": 88,
+        "frame_end": 255,
+        "frame_number": 167,
+        "time_start": "0:00:05.499967",
+        "time_end": "0:00:15.937404",
+        "time_delta": "0:00:10.437437",
+        "mean_face": 5.875
+    }
+]

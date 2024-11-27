@@ -7,7 +7,7 @@ video_path = "src/videos/video_test.mp4"
 folder = Path("./output/test1/")
 
 start = "00:00:00"  # Specify start time in hh:mm:ss
-end = None  # Specify end time in hh:mm:ss
+end = "00:15:00"  # Specify end time in hh:mm:ss
 
 frame_width = 1675
 frame_height = 1080 - 65
@@ -20,5 +20,5 @@ height_slice = slice(65, 1080)
 crop_detect(video_path=video_path,
             time=(start,end),
             crop_frame=(height_slice,width_slice),
-            folder=folder)
-
+            folder=folder,
+            debug=False)
