@@ -6,8 +6,8 @@ from Utils.functions import crop_detect
 video_path = "src/videos/video_test.mp4"
 folder = Path("./output/test1/")
 
-start = "00:00:00"  # Specify start time in hh:mm:ss
-end = "00:15:00"  # Specify end time in hh:mm:ss
+start = "00:19:00"  # Specify start time in hh:mm:ss
+end = "00:20:00"  # Specify end time in hh:mm:ss
 
 frame_width = 1675
 frame_height = 1080 - 65

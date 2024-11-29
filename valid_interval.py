@@ -93,4 +93,4 @@ def visualize_frames_in_grids(frames: List[Tuple[int, np.ndarray]], grid_size: i
         plt.subplots_adjust(wspace=0, hspace=0)
         plt.show()
 
-process_frames("src/videos/video_test.mp4", intervals=[(6280,6288)])
+process_frames("src/videos/video_test.mp4", intervals=[(18300,18570)])

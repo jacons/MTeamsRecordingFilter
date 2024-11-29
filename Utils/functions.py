@@ -237,17 +237,14 @@ def crop_detect(video_path: str, time: Tuple[str, Union[str, None]], crop_frame:
         cropped_frame = frame[crop_frame[0], crop_frame[1], :]
         to_gray = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2GRAY)
 
-        flag, boxes = False, 0
         for classifier in classifiers:
-            boxes = classifier.detectMultiScale(image=to_gray, scaleFactor=1.4, minNeighbors=5, minSize=(40, 40))
+            boxes = classifier.detectMultiScale(image=to_gray, scaleFactor=1.4, minNeighbors=5, minSize=(30, 30))
             if debug:
                 for (x, y, w, h) in boxes:
                     cv2.rectangle(cropped_frame, (x, y), (x + w, y + h), (255, 0, 0), 4)
             if len(boxes) > 0:
-                flag = True
+                face_frames.append(face_tuple(frame=n_frame, boxes=len(boxes)))
                 break
-        if flag:
-            face_frames.append(face_tuple(frame=n_frame, boxes=len(boxes)))
         return cropped_frame
 
     process_frames(video_path=video_path, time=time, fn=crop_detect_fn, debug=debug)
